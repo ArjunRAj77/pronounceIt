@@ -2,14 +2,49 @@ import streamlit as st
 import pronouncing  # Install this library using 'pip install pronouncing'
 import pandas as pd
 
-def get_pronunciation(word):
-    """Fetches the pronunciation of a word using the pronouncing library."""
-    pronunciations = pronouncing.phones_for_word(word.lower())  # Convert to lowercase for consistency
-    return pronunciations[0] if pronunciations else "No pronunciation found"
+def get_phonetic_spelling(word):
+    """Fetches the phonetic spelling of a word in a human-readable format."""
+    pronunciations = pronouncing.phones_for_word(word.lower())
+    if not pronunciations:
+        return "Phonetic spelling not found"
+    
+    # Simplify CMU phoneme notation into a readable phonetic spelling
+    cmu_to_phonetic = {
+        "AA": "ah", "AE": "a", "AH": "uh", "AO": "aw", "AW": "ow",
+        "AY": "ai", "B": "b", "CH": "ch", "D": "d", "DH": "th",
+        "EH": "e", "ER": "ur", "EY": "ay", "F": "f", "G": "g",
+        "HH": "h", "IH": "i", "IY": "ee", "JH": "j", "K": "k",
+        "L": "l", "M": "m", "N": "n", "NG": "ng", "OW": "oh",
+        "OY": "oy", "P": "p", "R": "r", "S": "s", "SH": "sh",
+        "T": "t", "TH": "th", "UH": "oo", "UW": "oo", "V": "v",
+        "W": "w", "Y": "y", "Z": "z", "ZH": "zh"
+    }
+
+    # Custom replacements for better readability
+    cluster_replacements = {
+        "h y uw": "hyoo",
+        "ah n": "uhn",
+        "ah": "uh"
+    }
+
+    # Process the first available pronunciation
+    pronunciation = pronunciations[0]
+    phonemes = pronunciation.split()
+    phonemes = [ph[:-1] if ph[-1].isdigit() else ph for ph in phonemes]  # Remove stress markers
+
+    # Build the phonetic spelling
+    phonetic_spelling = " ".join(cmu_to_phonetic.get(ph, ph.lower()) for ph in phonemes)
+    
+    # Apply custom replacements for clusters
+    for cluster, replacement in cluster_replacements.items():
+        phonetic_spelling = phonetic_spelling.replace(cluster, replacement)
+    
+    # Format the result (replace spaces with hyphens for readability)
+    return phonetic_spelling.replace(" ", "-")
 
 def main():
-    st.title("Word Pronunciation Finder")
-    st.write("Provide a list of words (manual input or upload a CSV) to get their pronunciations in a table format.")
+    st.title("PronounceIt - Phonetic spelling Generator")
+    st.write("Provide a list of words (manual input or upload a CSV) to get their phonetic spellings in a table format.")
     
     # Input method selection
     input_method = st.radio("Choose input method:", ["Manual Input", "Upload CSV"])
@@ -17,10 +52,10 @@ def main():
     if input_method == "Manual Input":
         # Manual text input
         words_input = st.text_area("Enter words (separated by commas or new lines):")
-        if st.button("Get Pronunciations"):
+        if st.button("Get Phonetic Spellings"):
             if words_input.strip():
                 words = [word.strip() for word in words_input.replace("\n", ",").split(",")]
-                generate_pronunciation_table(words)
+                generate_phonetic_table(words)
             else:
                 st.warning("Please provide a list of words.")
     
@@ -34,25 +69,28 @@ def main():
                     st.error("The uploaded CSV must contain a column named 'Word'.")
                 else:
                     words = df["Word"].tolist()
-                    generate_pronunciation_table(words)
+                    generate_phonetic_table(words)
             except Exception as e:
                 st.error(f"An error occurred while processing the file: {e}")
 
-def generate_pronunciation_table(words):
-    """Generates and displays the pronunciation table, with an option to download it."""
-    pronunciations = [{"Word": word, "Pronunciation": get_pronunciation(word)} for word in words]
-    result_df = pd.DataFrame(pronunciations)
+def generate_phonetic_table(words):
+    """Generates and displays the phonetic spelling table, with an option to download it as a .txt file."""
+    phonetics = [{"Word": word, "Phonetic Spelling": get_phonetic_spelling(word)} for word in words]
+    result_df = pd.DataFrame(phonetics)
     
-    st.write("### Pronunciation Table")
+    st.write("### Phonetic Spelling Table")
     st.table(result_df)  # Display table in Streamlit
     
-    # Provide download option
-    csv = result_df.to_csv(index=False)
+    # Prepare the data for .txt download
+    txt_content = "Word\tPhonetic Spelling\n"
+    txt_content += "\n".join(f"{row['Word']}\t{row['Phonetic Spelling']}" for _, row in result_df.iterrows())
+    
+    # Provide download option for .txt
     st.download_button(
-        label="Download Table as CSV",
-        data=csv,
-        file_name="pronunciation_table.csv",
-        mime="text/csv",
+        label="Download Table as TXT",
+        data=txt_content,
+        file_name="phonetic_spelling_table.txt",
+        mime="text/plain",
     )
 
 if __name__ == "__main__":
