@@ -1,3 +1,4 @@
 streamlit
 pronouncing
 pandas
+setuptools==69.5.1
